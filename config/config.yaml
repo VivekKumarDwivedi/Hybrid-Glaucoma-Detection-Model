@@ -7,12 +7,12 @@ project:
   output_dir: "outputs"
 
 data:
-  zip_path: "data/raw/Data_on_OCT_and_Fundus_Images.zip"
+  file_path: "data/Data on OCT and Fundus Images"
   img_size: 224
   num_classes: 2
 
 training:
-  model_name: "densenet"  # Options: 'resnet', 'densenet', 'ensemble'
+  model_name: "ensemble"  # Options: 'resnet', 'densenet', 'ensemble'
   n_folds: 5
   epochs: 25
   batch_size: 8
