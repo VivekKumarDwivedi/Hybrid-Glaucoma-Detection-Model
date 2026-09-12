@@ -1,16 +1,5 @@
 venv/
-.venv/
 __pycache__/
-*.py[cod]
-
-# Local dataset and generated training artifacts
+*.pyc
 data/
 outputs/
-
-# Python tooling and local environment files
-.pytest_cache/
-.mypy_cache/
-.ipynb_checkpoints/
-.env
-.env.*
-!.env.example

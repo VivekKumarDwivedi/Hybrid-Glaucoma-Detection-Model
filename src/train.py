@@ -10,6 +10,13 @@ from sklearn.metrics import classification_report, accuracy_score, f1_score, roc
 
 from src.dataset import GlaucomaDataset, get_transforms
 from src.models import get_model
+from src.utils import (
+    plot_fold_summary,
+    plot_roc_and_cm,
+    plot_probability_distribution,
+    plot_gradcam,
+    plot_architecture_summary,
+)
 
 def train_epoch(model, loader, criterion, optimizer, device):
     model.train()
@@ -47,17 +54,19 @@ def eval_epoch(model, loader, criterion, device):
             
     return total_loss / len(loader), correct / len(loader.dataset), np.array(preds), np.array(probs), np.array(truths)
 
-def run_cross_validation(images, labels, config):
+def run_cross_validation(images, labels, names, config):
     device = torch.device(config['training']['device'] if torch.cuda.is_available() else 'cpu')
     labels_arr = np.array(labels)
     skf = StratifiedKFold(n_splits=config['training']['n_folds'], shuffle=True, random_state=config['project']['seed'])
 
     all_preds, all_probs, all_labels = [], [], []
+    fold_results = []
 
     for fold, (tr_idx, va_idx) in enumerate(skf.split(images, labels_arr), 1):
         print(f"\n--- Fold {fold}/{config['training']['n_folds']} ---")
         train_imgs, train_lbls = [images[i] for i in tr_idx], labels_arr[tr_idx].tolist()
         val_imgs, val_lbls = [images[i] for i in va_idx], labels_arr[va_idx].tolist()
+        val_names = [names[i] for i in va_idx]
 
         counts = Counter(train_lbls)
         weights = [1.0 / counts[l] for l in train_lbls]
@@ -92,6 +101,37 @@ def run_cross_validation(images, labels, config):
         _, _, preds, probs, truths = eval_epoch(model, va_loader, criterion, device)
         all_preds.extend(preds); all_probs.extend(probs); all_labels.extend(truths)
 
+        fold_results.append({
+            'fold': fold,
+            'acc': accuracy_score(truths, preds),
+            'f1': f1_score(truths, preds, zero_division=0),
+            'auc': roc_auc_score(truths, probs) if len(np.unique(truths)) > 1 else 0.5,
+        })
+
+    output_dir = config['project']['output_dir']
+    plot_fold_summary(fold_results, output_dir=output_dir)
+    plot_roc_and_cm(
+        np.asarray(all_labels),
+        np.asarray(all_probs),
+        np.asarray(all_preds),
+        output_dir=output_dir,
+    )
+    plot_probability_distribution(
+        np.asarray(all_labels),
+        np.asarray(all_probs),
+        output_dir=output_dir,
+    )
+    plot_gradcam(
+        model,
+        val_imgs,
+        val_lbls,
+        val_names,
+        get_transforms,
+        device,
+        img_size=config['data']['img_size'],
+        output_dir=output_dir,
+    )
+
     print("\n" + "="*50)
     print("FINAL CROSS-VALIDATION RESULTS")
     print("="*50)
@@ -101,3 +141,4 @@ def run_cross_validation(images, labels, config):
     save_path = f"{config['project']['output_dir']}/checkpoints/best_{config['training']['model_name']}_model.pth"
     torch.save(best_state, save_path)
     print(f"Saved best model checkpoint to {save_path}")
+    plot_architecture_summary(model)

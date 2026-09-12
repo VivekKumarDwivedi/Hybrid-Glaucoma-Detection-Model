@@ -22,7 +22,7 @@ def main():
     images, labels, names = load_data_from_zip(config['data']['file_path'])
     print(f"Dataset successfully loaded: {len(images)} images found.")
 
-    run_cross_validation(images, labels, config)
+    run_cross_validation(images, labels, names, config)
 
 if __name__ == "__main__":
     main()
