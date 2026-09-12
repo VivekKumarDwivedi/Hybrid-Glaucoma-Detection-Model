@@ -30,6 +30,41 @@ PALETTE = {
     'val': '#E24B4A'
 }
 
+
+class GradCAM:
+    """Generate a Grad-CAM heatmap for a selected convolutional layer."""
+
+    def __init__(self, model, target_layer):
+        self.model = model
+        self.activations = None
+        self.gradients = None
+        self._forward_handle = target_layer.register_forward_hook(self._save_activation)
+
+    def _save_activation(self, module, inputs, output):
+        self.activations = output
+        output.register_hook(self._save_gradient)
+
+    def _save_gradient(self, gradient):
+        self.gradients = gradient
+
+    def generate_heatmap(self, input_tensor, target_class=1):
+        self.model.eval()
+        output = self.model(input_tensor)
+        self.model.zero_grad(set_to_none=True)
+        output[0, target_class].backward()
+
+        gradients = self.gradients[0].detach().cpu().numpy()
+        activations = self.activations[0].detach().cpu().numpy()
+        weights = gradients.mean(axis=(1, 2))
+        heatmap = np.sum(weights[:, None, None] * activations, axis=0)
+        heatmap = np.maximum(heatmap, 0)
+        heatmap = cv2.resize(
+            heatmap,
+            (input_tensor.shape[3], input_tensor.shape[2]),
+        )
+        heatmap -= heatmap.min()
+        return heatmap / (heatmap.max() + 1e-8)
+
 def set_seed(seed=42):
     """Sets random seeds across libraries for strict reproducibility."""
     random.seed(seed)
